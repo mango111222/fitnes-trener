@@ -1,0 +1,76 @@
+name: Фитнес-тренер
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Загружаем код
+        uses: actions/checkout@v4
+
+      - name: Читаем конфигурацию
+        id: config
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          PROJECT_NAME=$(jq -r '.project_name' config.json)
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
+      - name: Определяем день и час
+        id: context
+        run: |
+          DAY=$(date +%u)
+          HOUR=$(date +%H)
+          DAY_NAME=$(date +%A)
+          echo "day=$DAY" >> $GITHUB_OUTPUT
+          echo "hour=$HOUR" >> $GITHUB_OUTPUT
+          echo "day_name=$DAY_NAME" >> $GITHUB_OUTPUT
+
+      - name: Генерируем сообщение (утренняя тренировка)
+        id: workout_msg
+        if: steps.context.outputs.hour == '09'
+        run: |
+          DAY_NAME=$(date +%A)
+          DAY_NAME_LOWER=$(echo "$DAY_NAME" | tr '[:upper:]' '[:lower:]')
+          WORKOUT=$(jq -r ".daily_workout.\"$DAY_NAME_LOWER\"" config.json)
+          MESSAGE="🏋️ *Доброе утро! Твоя тренировка на $DAY_NAME:*\n\n$WORKOUT\n\n💪 *Совет:* Не забудь размяться перед тренировкой и выпить стакан воды!\n\n📊 *Цель на неделю:* выполнить 5 тренировок"
+          echo "text=$MESSAGE" >> $GITHUB_OUTPUT
+
+      - name: Генерируем сообщение (напоминание о воде)
+        id: water_msg
+        if: steps.context.outputs.hour == '15'
+        run: |
+          TARGET=$(jq -r '.water_reminder.target_liters' config.json)
+          MESSAGE="💧 *Напоминание о воде!*\n\n🚰 Сегодня нужно выпить $TARGET литра воды.\n✅ Выпил уже? Не забывай пить каждые 30-40 минут.\n\n💚 Вода помогает мышцам восстанавливаться после тренировки!"
+          echo "text=$MESSAGE" >> $GITHUB_OUTPUT
+
+      - name: Отправляем в Telegram (утро)
+        if: steps.context.outputs.hour == '09'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${{ steps.workout_msg.outputs.text }}" \
+            -d parse_mode="Markdown"
+
+      - name: Отправляем в Telegram (вода)
+        if: steps.context.outputs.hour == '15'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${{ steps.water_msg.outputs.text }}" \
+            -d parse_mode="Markdown"
+
+      - name: Сохраняем историю
+        run: |
+          echo "$(date '+%Y-%m-%d %H:%M:%S') - Запуск в $(date +%H):00" >> history.log
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add history.log
+          git commit -m "Обновление истории $(date '+%Y-%m-%d')" || echo "Нет изменений"
+          git push || echo "Нечего пушить"
