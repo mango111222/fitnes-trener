@@ -12,7 +12,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
 
       - name: Generate message
         id: message
@@ -21,7 +23,7 @@ jobs:
           DAY_NAME_LOWER=$(echo "$DAY_NAME" | tr '[:upper:]' '[:lower:]')
           WORKOUT=$(jq -r ".daily_workout.\"$DAY_NAME_LOWER\"" config.json)
           TARGET=$(jq -r '.water_reminder.target_liters' config.json)
-          MESSAGE="🏋️ Фитнес-тренер приветствует тебя!\n\nСегодня: $DAY_NAME\n\nТренировка:\n$WORKOUT\n\nНорма воды на сегодня: $TARGET литра\n\nЖелаю продуктивной тренировки!"
+          MESSAGE="Фитнес-тренер приветствует тебя!%0A%0AСегодня: $DAY_NAME%0A%0AТренировка:%0A$WORKOUT%0A%0AНорма воды на сегодня: $TARGET литра%0A%0AЖелаю продуктивной тренировки!"
           echo "text=$MESSAGE" >> $GITHUB_OUTPUT
 
       - name: Send to Telegram
