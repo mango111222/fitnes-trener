@@ -8,36 +8,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Загружаем код
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Устанавливаем jq
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Генерируем сообщение
+      - name: Generate message
         id: message
         run: |
           DAY_NAME=$(date +%A)
           DAY_NAME_LOWER=$(echo "$DAY_NAME" | tr '[:upper:]' '[:lower:]')
           WORKOUT=$(jq -r ".daily_workout.\"$DAY_NAME_LOWER\"" config.json)
           TARGET=$(jq -r '.water_reminder.target_liters' config.json)
-          
-          MESSAGE="🏋️ *Фитнес-тренер приветствует тебя!*
-          
-📅 *Сегодня:* $DAY_NAME
-
-💪 *Тренировка:*
-$WORKOUT
-
-💧 *Норма воды на сегодня:* $TARGET литра
-
-🔥 Желаю продуктивной тренировки!"
-
+          MESSAGE="🏋️ Фитнес-тренер приветствует тебя!\n\nСегодня: $DAY_NAME\n\nТренировка:\n$WORKOUT\n\nНорма воды на сегодня: $TARGET литра\n\nЖелаю продуктивной тренировки!"
           echo "text=$MESSAGE" >> $GITHUB_OUTPUT
 
-      - name: Отправляем в Telegram
+      - name: Send to Telegram
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="${{ steps.message.outputs.text }}" \
-            -d parse_mode="Markdown"
+            -d text="${{ steps.message.outputs.text }}"
